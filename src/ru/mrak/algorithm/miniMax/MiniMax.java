@@ -11,9 +11,9 @@ public class MiniMax <S extends State, A extends Action>{
     private final CheckEndGame<S> checkEndGame;
     private final int deep;
 
-    private double maxValue;
+    private Double maxValue;
     private Action maxAction;
-    private final Deque<StateAndDeep> stateToWork = new LinkedList<>();
+    //private final Deque<StateAndDeep> stateToWork = new LinkedList<>();
 
     public MiniMax(ValueFunction<S> valueFunction,
                    ActionsFromState<S> actionsFromState,
@@ -29,13 +29,15 @@ public class MiniMax <S extends State, A extends Action>{
     }
 
     public Action getNextAction(S state) {
-        maxValue = -10000.0;
+        maxValue = null;
 
         firstIter(state);
         nexIter();
 
         return maxAction;
     }
+
+    private
 
     private void firstIter(S state) {
         Collection<Action> firstActions = actionsFromState.getActions(state);
