@@ -87,4 +87,17 @@ public class Matrix <T> implements Iterable {
             }
         };
     }
+
+    @Override
+    public String toString() {
+        StringBuilder result = new StringBuilder();
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                result.append(get(row, col));
+                result.append("\t");
+            }
+            result.append("\n");
+        }
+        return result.toString();
+    }
 }

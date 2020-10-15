@@ -1,110 +1,74 @@
 package ru.mrak.algorithm.miniMax;
 
 import java.util.Collection;
-import java.util.Deque;
-import java.util.LinkedList;
 
-public class MiniMax <S extends State, A extends Action>{
-    private final ValueFunction<S> valueFunction;
+public class MiniMax <S extends State, A extends Action, P extends Player>{
+    private final ValueFunction<S, P> valueFunction;
     private final ActionsFromState<S> actionsFromState;
     private final StateFromAction<A, S> stateFromAction;
-    private final CheckEndGame<S> checkEndGame;
+    private final P player;
     private final int deep;
 
-    private Double maxValue;
-    private Action maxAction;
-    //private final Deque<StateAndDeep> stateToWork = new LinkedList<>();
-
-    public MiniMax(ValueFunction<S> valueFunction,
+    public MiniMax(ValueFunction<S, P> valueFunction,
                    ActionsFromState<S> actionsFromState,
                    StateFromAction<A, S> stateFromAction,
-                   CheckEndGame<S> checkEndGame,
+                   P player,
                    int deep) {
         this.valueFunction = valueFunction;
         this.actionsFromState = actionsFromState;
         this.stateFromAction = stateFromAction;
-        this.checkEndGame = checkEndGame;
-
+        this.player = player;
         this.deep = deep;
     }
 
-    public Action getNextAction(S state) {
-        maxValue = null;
+    public A getNextAction(S state) {
+        return firstIter(state);
+    }
 
-        firstIter(state);
-        nexIter();
+    private A firstIter(S state) {
+        Collection<Action> firstActions = actionsFromState.getActions(state);
+        Double maxValue = null;
+        A maxAction = null;
+
+        if (firstActions.isEmpty()) throw new RuntimeException();
+
+        for (Action action : firstActions) {
+            double value = nextIter(stateFromAction.getState((A)action, state), 0);
+            if (maxValue == null || maxValue < value) {
+                maxValue = value;
+                maxAction = (A) action;
+            }
+        }
 
         return maxAction;
     }
 
-    private
 
-    private void firstIter(S state) {
-        Collection<Action> firstActions = actionsFromState.getActions(state);
+    private double nextIter(S state, int iter) {
+        Double result = null;
+        Collection<Action> actions = actionsFromState.getActions(state);
+        iter++;
 
-        if (deep == 0) {
-            for (Action firstAction : firstActions) {
-                S newState = stateFromAction.getState((A)firstAction, state);
-                double newValue = valueFunction.getValue(newState);
-                if (maxValue < newValue) {
-                    maxValue = newValue;
-                    maxAction = firstAction;
-                }
-            }
+        if (actions.isEmpty() || iter == deep) {
+            result = valueFunction.getValue(state, player);
         } else {
-            for (Action firstAction : firstActions) {
-                S newState = stateFromAction.getState((A)firstAction, state);
-                stateToWork.addLast(new StateAndDeep(newState, 1, (A)firstAction));
-            }
-        }
-    }
-
-
-    private void nexIter() {
-        while (stateToWork.size() > 0) {
-            StateAndDeep stateAndDeep = stateToWork.pollFirst();
-
-            boolean endGame = checkEndGame.isEndGame(stateAndDeep.state);
-            if (endGame) {
-                double newValue = valueFunction.getValue(stateAndDeep.state);
-                if (maxValue < newValue) {
-                    maxValue = newValue;
-                    maxAction = stateAndDeep.firstAction;
-                }
-                continue;
-            }
-
-            Collection<Action> actions = actionsFromState.getActions(stateAndDeep.state);
-
-            if (deep == stateAndDeep.deep) {
-                for (Action action : actions) {
-                    S newState = stateFromAction.getState((A)action, stateAndDeep.state);
-                    double newValue = valueFunction.getValue(newState);
-                    if (maxValue < newValue) {
-                        maxValue = newValue;
-                        maxAction = stateAndDeep.firstAction;
+            for (Action action : actions) {
+                if (player.equals(action.getPlayer())) {
+                    S newState = stateFromAction.getState((A) action, state);
+                    double value = nextIter(newState, iter);
+                    if (result == null || result < value) {
+                        result = value;
+                    }
+                } else {
+                    S newState = stateFromAction.getState((A) action, state);
+                    double value = nextIter(newState, iter);
+                    if (result == null || result > value) {
+                        result = value;
                     }
                 }
-            } else {
-                for (Action action : actions) {
-                    S newState = stateFromAction.getState((A)action, stateAndDeep.state);
-                    stateToWork.addLast(new StateAndDeep(newState, stateAndDeep.deep + 1, stateAndDeep.firstAction));
-                }
             }
         }
+
+        return result;
     }
-
-    private class StateAndDeep {
-        S state;
-        int deep;
-        A firstAction;
-
-        public StateAndDeep(S state, int deep, A firstAction) {
-            this.state = state;
-            this.deep = deep;
-            this.firstAction = firstAction;
-        }
-    }
-
-
 }

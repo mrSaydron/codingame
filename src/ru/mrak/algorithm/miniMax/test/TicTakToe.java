@@ -3,19 +3,21 @@ package ru.mrak.algorithm.miniMax.test;
 import ru.mrak.algorithm.miniMax.*;
 import ru.mrak.types.Matrix;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class TicTakToe {
 
     public static class GameState implements State {
-        Matrix<Cell> matrix = new Matrix<>(3, 3, Cell.empty);
+        Matrix<Cell> matrix = new Matrix<>(3, 3, Cell.e);
         Cell player;
+
+        public Player getPlayer() {
+            return player;
+        }
     }
 
-    public enum  Cell {
-        empty,
+    public enum  Cell implements Player {
+        e,
         X,
         O;
 
@@ -33,6 +35,10 @@ public class TicTakToe {
             this.column = column;
         }
 
+        public Cell getPlayer() {
+            return player;
+        }
+
         @Override
         public String toString() {
             return "GameAction{" +
@@ -42,15 +48,6 @@ public class TicTakToe {
                     '}';
         }
     }
-
-    public static CheckEndGame<GameState> checkEndGame = state -> {
-        boolean result = false;
-        for (Cell player : Cell.players) {
-            result = result || checkWin(state, player);
-        }
-        result = result || checkDraw(state);
-        return result;
-    };
 
     private static boolean checkWin(GameState state, Cell player) {
         boolean result = false;
@@ -85,7 +82,7 @@ public class TicTakToe {
         end:
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
-                if (state.matrix.get(i, j).equals(Cell.empty)) {
+                if (state.matrix.get(i, j).equals(Cell.e)) {
                     result = false;
                     break end;
                 }
@@ -96,11 +93,17 @@ public class TicTakToe {
 
     public static ActionsFromState<GameState> actionsFromState = state -> {
         List<Action> result = new ArrayList<>();
-        Cell nextPlayer = nextPlayer(state.player);
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
-                if (state.matrix.get(i, j).equals(Cell.empty)) {
-                    result.add(new GameAction(nextPlayer, i, j));
+        boolean win = false;
+        for (Cell player : Cell.players) {
+            win = win || checkWin(state, player);
+        }
+        if (!win) {
+            Cell nextPlayer = nextPlayer(state.player);
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
+                    if (state.matrix.get(i, j).equals(Cell.e)) {
+                        result.add(new GameAction(nextPlayer, i, j));
+                    }
                 }
             }
         }
@@ -114,11 +117,11 @@ public class TicTakToe {
         return Cell.players.get(0);
     }
 
-    public static ValueFunction<GameState> valueFunction = state -> {
+    public static ValueFunction<GameState, Cell> valueFunction = (state, player) -> {
         double result = 0;
-        if (checkWin(state, Cell.X)) {
+        if (checkWin(state, player)) {
             result = 100;
-        } else if (checkWin(state, Cell.O)) {
+        } else if (checkWin(state, player == Cell.X ? Cell.O : Cell.X)) {
             result = -100;
         }
         return result;
@@ -134,8 +137,85 @@ public class TicTakToe {
 
     public static GameState newGame() {
         GameState state = new GameState();
-        state.matrix = new Matrix<>(3, 3, Cell.empty);
+        state.matrix = new Matrix<>(3, 3, Cell.e);
         state.player = Cell.O;
         return state;
+    }
+
+    static Scanner scanner = new Scanner(System.in);
+
+    public static void main(String[] args) {
+        GameState state = newGame();
+        Map<Cell, Avatar> turn = new HashMap<>();
+
+        for (Cell player : Cell.players) {
+            System.out.print(player + ": ");
+            String playerName = scanner.next();
+            if (playerName.contains("miniMax")) {
+                MiniMaxPlayer mmPlayer = new MiniMaxPlayer();
+                mmPlayer.name = playerName;
+                mmPlayer.player = player;
+                mmPlayer.miniMax = new MiniMax<>(
+                        valueFunction,
+                        actionsFromState,
+                        stateFromAction,
+                        player,
+                        10);
+
+                turn.put(player, mmPlayer);
+            } else {
+                HumanPlayer humanPlayer = new HumanPlayer();
+                humanPlayer.name = playerName;
+                humanPlayer.player = player;
+
+                turn.put(player, humanPlayer);
+            }
+        }
+
+        System.out.println("start game");
+        while(true) {
+            Cell player = nextPlayer(state.player);
+            Avatar avatar = turn.get(player);
+            System.out.println("Turn of: " + player + " (" + avatar.name + ")");
+
+            state = avatar.turn(state);
+
+            System.out.println(state.matrix);
+            if (checkWin(state, player)) {
+                System.out.println("Win: " + avatar.name);
+                break;
+            }
+            if (checkDraw(state)) {
+                System.out.println("Game draw");
+                break;
+            }
+        }
+    }
+
+    static abstract class Avatar {
+        String name;
+        Cell player;
+
+        abstract GameState turn(GameState state);
+    }
+
+    static class HumanPlayer extends Avatar {
+        GameState turn(GameState state) {
+            System.out.print("print turn: ");
+            String row = scanner.next();
+            String col = scanner.next();
+            GameAction action = new GameAction(player, Integer.parseInt(row), Integer.parseInt(col));
+            return stateFromAction.getState(action, state);
+        }
+    }
+
+    static class MiniMaxPlayer extends Avatar {
+        MiniMax<GameState, GameAction, Cell> miniMax;
+
+        @Override
+        GameState turn(GameState state) {
+            GameAction nextAction = (GameAction) miniMax.getNextAction(state);
+            return stateFromAction.getState(nextAction, state);
+        }
     }
 }
